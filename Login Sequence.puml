@@ -1,0 +1,96 @@
+@startuml
+
+box User (Untrusted)
+    participant User
+    participant "Game Client" as Game
+    participant "DLL Bind" as DllBind
+    participant "Windows Registry" as Registry
+end box
+
+box Official Infrastructure (Trusted) #LightBlue
+    participant "Renegade X Website" as AuthServer
+end box
+
+User -> Game: Launch
+Game -> User: Loading Screen (intro video)
+group Validate Cached AuthID
+    Game -> DllBind: StartVerifyCachedAuthID()
+    DllBind -> Registry: Read AuthToken
+    activate Registry
+    return AuthToken value
+    alt AuthToken exists
+        DllBind -> AuthServer: Validate AuthID Request
+        DllBind -> Game: True (Request started)
+        loop Wait for response
+            Game -> DllBind: CheckAuthRequest()
+            DllBind --> Game: RequestInProgress
+        end
+        alt Authentication success
+            AuthServer --> DllBind: Authentication Token, ID
+            Game -> DllBind: CheckAuthRequest()
+            DllBind --> Game: Success
+            Game -> User: Go to main menu / join server
+        else Authentication failed
+            AuthServer --> DllBind: Authentication Failed
+            Game -> DllBind: CheckAuthRequest()
+            DllBind --> Game: Failure
+            Game -> User: Go to Login Screen
+        else Authentication Server Offline / No Response
+            Game -> DllBind: CheckAuthRequest()
+            DllBind --> Game: Timeout
+            Game -> User: "Unable to login; continue anyways?"
+            alt User clicks 'Yes'
+                User -> Game: Yes
+                Game -> User: Go to main menu / join server
+            else User clicks 'Exit'
+                User -> Game: Exit
+                Game -> Game: Exit
+            end
+        end
+    else
+        DllBind -> Game: False (No cached credentials)
+        Game -> User: Go to Login
+    end
+end
+
+group Login
+    User -> Game: Login Credentials
+    Game -> DllBind: StartLoginRequest()
+    DllBind -> AuthServer: Authentication Request
+    DllBind --> Game
+
+    loop Wait for response
+        Game -> DllBind: CheckAuthRequest()
+        DllBind --> Game: RequestInProgress
+    end
+
+    alt Authentication Success
+        AuthServer --> DllBind: Authentication Token, UserID
+        opt Remember Me Checkbox Checked
+            DllBind -> Registry: Store AuthID, UserID
+            activate Registry
+            return
+        end
+
+        Game -> DllBind: CheckAuthRequest()
+        DllBind --> Game: Success
+        Game --> User: Login Success; go to main menu / join server
+    else Authentication Failure
+        AuthServer --> DllBind: Authentication Failed
+        Game -> DllBind: CheckAuthRequest()
+        DllBind --> Game: Failure
+        Game --> User: Display error; repeat Login
+    else Authentication Server Offline / No Response
+        Game -> DllBind: CheckAuthRequest()
+        DllBind --> Game: Timeout
+        Game -> User: "Unable to login; continue anyways?"
+        alt User clicks 'Yes'
+            User -> Game: Yes
+            Game -> User: Go to main menu / join server
+        else User clicks 'Exit'
+            Game -> Game: Exit
+        end
+    end
+end
+
+@enduml

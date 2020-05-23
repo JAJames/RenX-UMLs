@@ -1,0 +1,57 @@
+@startuml
+
+together {
+    actor "New Player" as NewUser
+    actor "Old Player" as OldUser
+
+    note left of NewUser {
+        This is any player who has
+        only been in this match
+    }
+
+    note right of OldUser {
+        This is any player who was
+        also in the previous match
+
+        We trust this guy a little more,
+        because the DDoSer probably isn't
+        playing real games.
+    }
+}
+
+cloud "Public Proxy Servers" as PubProxies {
+    node cmg1
+    node cmg2
+}
+
+note bottom of PubProxies
+    These are the only nodes
+    put on the server list
+end note
+
+cloud "Private Proxy Servers" as PrivProxies {
+    node bong1
+
+    note as PrivProxiesNote
+        We move previous players here so that when
+        the public proxy servers are inevitably taken
+        down, these guys won't get disconnected!
+    end note
+}
+
+cloud "Private Game Servers" as PrivServers {
+    node "Official NA" as NA1
+    node "Official EU" as EU1
+
+    note as PrivServersNote
+        These are never exposed, to anybody at all
+    end note
+}
+
+NewUser --> PubProxies
+OldUser --> PrivProxies
+PubProxies --> PrivServers
+PrivProxies --> PrivServers
+NewUser ..> PrivProxies : Used only when in failover
+
+@enduml

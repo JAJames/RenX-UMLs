@@ -1,0 +1,63 @@
+@startuml
+
+box User (Untrusted)
+    participant User
+    participant "Game Client" as Game
+    participant DllBind
+end box
+
+box Game Server Infrastructure (Untrusted)
+    participant "Game Server" as GameServer
+    participant RCON
+end box
+
+box Official Infrastructure (Trusted) #LightBlue
+    participant "DevBot" as DevBot
+    participant "Renegade X Website" as AuthServer
+end box
+
+Game <-> GameServer: Normal UDK Game Join
+== Begin Normal Game Play ==
+
+Game -> GameServer: HWID
+
+group Token Validation
+    Game -> DllBind: StartJoinServerRequest(IP, Port)
+    DllBind -> DevBot: Auth Payload
+    note left
+        Note: Validation  needs to go through the DevBot,
+        so that the DevBot can get a verifiable response
+        from the AuthServer. Otherwise, the ID would have
+        to be validated twice -- once by the game server,
+        and once by the DevBot.
+
+        Additionally, if the DevBot is offline, then no
+        response will actually be received. This means the
+        player is neither authenticated, nor kicked. They're
+        just unauthenticated by default.
+    end note
+
+    opt DevBot online
+        DevBot -> AuthServer: Validate ID Request
+        alt Token is valid
+            AuthServer --> DevBot: Validation Success
+            DevBot -> GameServer: Auth Success for ID
+            GameServer -> RCON: Auth Success for ID
+        else Token is bad
+            AuthServer --> DevBot: Validation Failure
+            DevBot -> GameServer: Kick Player, Reason: "Invalid Login"
+            GameServer -> Game: Kick Player
+            Game -> User: Present Login Screen
+        else Site Offline / Timed Out
+            DevBot -> GameServer: Auth Failure for ID
+            GameServer -> RCON: Auth Failure for ID
+        end
+    end
+
+else Invalid Client (Client Doesn't Send Payload)
+    DevBot -> GameServer: Kick Player, Reason: "Invalid Login"
+    note right: Caused by 3 second timeout
+    GameServer -> Game: Kick Player, Reason: "Invalid Login"
+end
+
+@enduml

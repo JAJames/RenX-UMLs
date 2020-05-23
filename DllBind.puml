@@ -1,0 +1,50 @@
+@startuml
+
+allowmixing
+
+enum AuthRequestStatus {
+    Success // Logged in successfully
+    Failure // bad token, bad credentials
+    Timeout // API didn't respond
+    RequestInProgress // Still waiting for response
+}
+
+class DllBind {
+    +bool ClearCachedAuthID();
+
+    +bool StartVerifyCachedAuthID(int timeout_ms);
+    +void StartLoginRequest(string user, string password);
+    +void StartJoinServerRequest(string serverIP, int serverPort);
+    +AuthRequestStatus CheckAuthRequest();
+}
+
+cloud "Website / AuthServer API" {
+    class /register {
+        Type: Post
+        Payload: Email, Username, Password
+        Response: Success/Failure
+    }
+
+    class /validate {
+        Type: Post
+        Payload: AuthID, UserID
+        Response: Success/Failure
+    }
+
+    class /login {
+        Type: Post
+        Payload: Email or Username, Password
+        Response: Success/Failure
+    }
+
+    class /resetPassword {
+        Type: Post
+        Payload: Email or Username
+        Failure Response: No such account
+        Success Response: Check your email
+    }
+}
+
+hide empty members
+
+@enduml
